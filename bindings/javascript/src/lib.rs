@@ -65,7 +65,7 @@ pub struct Database {
     pub open: bool,
     #[napi(writable = false)]
     pub name: String,
-    _db: Arc<turso_core::Database>,
+    db: Option<Arc<turso_core::Database>>,
     conn: Arc<turso_core::Connection>,
     _io: Arc<dyn turso_core::IO>,
 }
@@ -74,6 +74,7 @@ impl ObjectFinalize for Database {
     // TODO: check if something more is required
     fn finalize(self, _env: Env) -> napi::Result<()> {
         self.conn.close().map_err(into_napi_error)?;
+        drop(self.db);
         Ok(())
     }
 }
@@ -108,7 +109,7 @@ impl Database {
         Ok(Self {
             readonly: opts.readonly(),
             memory,
-            _db: db,
+            db: Some(db),
             conn,
             open: true,
             name: path,
@@ -237,6 +238,7 @@ impl Database {
     pub fn close(&mut self) -> napi::Result<()> {
         if self.open {
             self.conn.close().map_err(into_napi_error)?;
+            self.db.take();
             self.open = false;
         }
         Ok(())
