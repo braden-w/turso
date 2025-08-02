@@ -42,6 +42,7 @@ mod numeric;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+use crate::storage::buffer_pool::BUFFER_POOL;
 use crate::translate::optimizer::optimize_plan;
 use crate::translate::pragma::TURSO_CDC_DEFAULT_TABLE_NAME;
 #[cfg(all(feature = "fs", feature = "conn_raw_api"))]
@@ -390,7 +391,8 @@ impl Database {
                 None => unsafe { (*shared_wal.get()).page_size() as usize },
                 Some(size) => size,
             };
-            let buffer_pool = Arc::new(BufferPool::new(Some(size)));
+            let buffer_pool = BufferPool::begin_init(&self.io, BufferPool::DEFAULT_ARENA_SIZE)
+                .finalize_page_size(size)?;
 
             let db_state = self.db_state.clone();
             let wal = Rc::new(RefCell::new(WalFile::new(
@@ -410,7 +412,8 @@ impl Database {
             return Ok(pager);
         }
 
-        let buffer_pool = Arc::new(BufferPool::new(page_size));
+        let buffer_pool = BufferPool::begin_init(&self.io, BufferPool::DEFAULT_ARENA_SIZE);
+
         // No existing WAL; create one.
         let db_state = self.db_state.clone();
         let mut pager = Pager::new(
@@ -431,11 +434,11 @@ impl Database {
                     .block(|| pager.with_header(|header| header.page_size))
                     .unwrap_or_default()
                     .get();
-                buffer_pool.set_page_size(size as usize);
                 size
             }
         };
 
+        buffer_pool.finalize_page_size(size as usize);
         let wal_path = format!("{}-wal", self.path);
         let file = self.io.open_file(&wal_path, OpenFlags::Create, false)?;
         let real_shared_wal = WalFileShared::new_shared(size, &self.io, file)?;
