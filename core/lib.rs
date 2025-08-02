@@ -42,7 +42,6 @@ mod numeric;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use crate::storage::buffer_pool::BUFFER_POOL;
 use crate::translate::optimizer::optimize_plan;
 use crate::translate::pragma::TURSO_CDC_DEFAULT_TABLE_NAME;
 #[cfg(all(feature = "fs", feature = "conn_raw_api"))]
@@ -397,7 +396,7 @@ impl Database {
                 Some(size) => size,
             };
             let buffer_pool =
-                BufferPool::begin_init(&self.io, arena_size).finalize_page_size(size)?;
+                BufferPool::begin_init(&self.io, arena_size).finalize_with_page_size(size)?;
 
             let db_state = self.db_state.clone();
             let wal = Rc::new(RefCell::new(WalFile::new(
