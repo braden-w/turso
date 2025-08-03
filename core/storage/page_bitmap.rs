@@ -346,7 +346,7 @@ impl PageBitmap {
     ///
     /// Word 1: ...11111111_11110000  (bits 60-63 must be checked)
     /// Word 2: 00000000_01111111...  (bits 0-6 must be checked)
-    pub fn check_run_free(&self, start: u32, len: u32) -> bool {
+    fn check_run_free(&self, start: u32, len: u32) -> bool {
         if start + len > self.n_pages {
             return false;
         }
